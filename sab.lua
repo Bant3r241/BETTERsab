@@ -7,7 +7,7 @@ if game.PlaceId == 109983668079237 then
     local EspTab = Window:MakeTab({Name="ESP", Icon="rbxassetid://4299432428", PremiumOnly=false})
     local MiscTab = Window:MakeTab({Name="Misc", Icon="rbxassetid://4299432428", PremiumOnly=false})
 
-    -- Compact ESP toggle
+    -- More compact ESP toggle
     EspTab:AddToggle({Name="Player ESP", Default=false, Callback=function(v)
         if v then
             loadstring(game:HttpGet("https://raw.githubusercontent.com/Bant3r241/chams/refs/heads/main/ESP.lua"))()
@@ -41,16 +41,22 @@ if game.PlaceId == 109983668079237 then
         return best
     end
 
-    -- Function to show or hide the best brainrot label
+    -- Function to show or hide the best brainrot label and log details in console
     local function toggleBestBrainrotVisibility(state)
         local best = findBestBrainrot()
         if best.part then
             if state then
-                createBrainrotLabel(best.part, best.name, best.raw)
-                print("[Best Brainrot] Name: " .. best.name .. "\nGeneration: " .. best.raw .. "\nValue per second: " .. best.value)
+                -- Display in the console
+                print("[Best Brainrot] Name: " .. best.name)
+                print("[Best Brainrot] Generation: " .. best.raw)
+                print("[Best Brainrot] Value per second: " .. best.value)
+                
+                -- Optionally, you can add logic to create a label in the game, or use `createBrainrotLabel()` from earlier.
+                -- createBrainrotLabel(best.part, best.name, best.raw)
             else
-                resetPart(best.part)
+                -- If you want to hide or reset the part, you can add that logic here.
                 print("[Debug] Best Brainrot visibility toggled off.")
+                -- resetPart(best.part)
             end
         else
             print("[Debug] No valid brainrot found.")
