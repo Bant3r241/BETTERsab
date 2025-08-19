@@ -7,30 +7,30 @@ if game.PlaceId == 109983668079237 then
     local EspTab = Window:MakeTab({Name="ESP", Icon="rbxassetid://4299432428", PremiumOnly=false})
     local MiscTab = Window:MakeTab({Name="Misc", Icon="rbxassetid://4299432428", PremiumOnly=false})
 
-    -- More compact ESP toggle
-    EspTab:AddToggle({
-        Name="Player ESP",
-        Default=false,
-        Callback=function(v)
-            if v then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/Bant3r241/chams/refs/heads/main/ESP.lua"))()
-            end
-        end
-    })
-
-    -- Function to parse strings like "$3.5M/s" to number
+    -- Parse "$3.5M/s" to number
     local function parseMoneyPerSec(text)
         local num, suffix = text:match("%$([%d%.]+)([KMBT]?)")
         if not num then return nil end
         num = tonumber(num)
         if not num then return nil end
-        local multipliers = {K=1e3, M=1e6, B=1e9, T=1e12}
+        local multipliers = {
+            K = 1e3,
+            M = 1e6,
+            B = 1e9,
+            T = 1e12
+        }
         return num * (multipliers[suffix] or 1)
     end
 
-    -- Find best brainrot plot info, including decorations part
+    -- Find Best Brainrot and return info + the Decoration part for ESP
     local function findBestBrainrot()
-        local best = {name = "Unknown", raw = "N/A", value = 0, podium = nil, decorationPart = nil}
+        local best = {
+            name = "Unknown",
+            raw = "N/A",
+            value = 0,
+            decorationPart = nil,
+            generationText = nil
+        }
 
         local plotsFolder = workspace:FindFirstChild("Plots")
         if plotsFolder then
@@ -57,11 +57,11 @@ if game.PlaceId == 109983668079237 then
                                         if value and value > best.value then
                                             best.value = value
                                             best.raw = text
+                                            best.generationText = text
                                             if nameLabel then
                                                 best.name = nameLabel.Text
                                             end
-                                            best.podium = podium
-
+                                            -- Get Decorations part for ESP (if exists)
                                             local decorations = base:FindFirstChild("Decorations")
                                             if decorations then
                                                 local part = decorations:FindFirstChild("Part")
@@ -82,41 +82,40 @@ if game.PlaceId == 109983668079237 then
         return best
     end
 
-    -- PartESP Module with neon glow text ESP for decorations
-    local PartESP = {}
+    -- Current ESP reference for toggling off
+    local currentBrainrotESP = nil
 
-    local select, next, tonumber, pcall, mathfloor, taskwait =
-        select, next, tonumber, pcall, math.floor, task.wait
-    local Vector2new, Vector3zero, Drawingnew =
-        Vector2.new, Vector3.new, Drawing.new
-
+    -- PartESP module (with rainbow name and no "Decorations" suffix)
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local Camera = workspace.CurrentCamera
 
-    local function WorldToViewportPoint(...)
-        return Camera:WorldToViewportPoint(...)
-    end
+    local PartESP = {}
 
-    function PartESP.AddESP(ObjectName, Object, TextSize)
+    function PartESP.AddESP(ObjectName, Object, TextSize, SpeedText)
+        local Drawing = Drawing
+
         local PartTable = {
             Name = Object.Name,
             OldPath = Object:GetFullName(),
-            ESP = Drawingnew("Text"),
-            GlowTexts = {},
-            Connections = {}
+            ESP = Drawing.new("Text"),
+            GlowName = {},
+            GlowSpeed = {},
+            GlowDistance = {},
+            Connections = {},
+            RainbowHue = 0,
         }
 
         local offsets = {
-            Vector2new(-1, 0), Vector2new(1, 0), Vector2new(0, -1), Vector2new(0, 1),
-            Vector2new(-1, -1), Vector2new(-1, 1), Vector2new(1, -1), Vector2new(1, 1),
+            Vector2.new(-1, 0), Vector2.new(1, 0), Vector2.new(0, -1), Vector2.new(0, 1),
+            Vector2.new(-1, -1), Vector2.new(-1, 1), Vector2.new(1, -1), Vector2.new(1, 1),
         }
 
         local function createGlowText(color)
             local texts = {}
             for _, offset in ipairs(offsets) do
-                local glowText = Drawingnew("Text")
+                local glowText = Drawing.new("Text")
                 glowText.Center = true
                 glowText.Size = TextSize or 24
                 glowText.Color = color
@@ -128,42 +127,50 @@ if game.PlaceId == 109983668079237 then
             return texts
         end
 
-        local glowName = createGlowText(Color3.fromRGB(255, 0, 0))
-        local glowSpeed = createGlowText(Color3.fromRGB(57, 255, 20))
-        local glowDistance = createGlowText(Color3.fromRGB(255, 0, 0))
+        PartTable.GlowName = createGlowText(Color3.fromRGB(255, 0, 0))      -- will override color with rainbow
+        PartTable.GlowSpeed = createGlowText(Color3.fromRGB(57, 255, 20))
+        PartTable.GlowDistance = createGlowText(Color3.fromRGB(255, 0, 0))
 
-        PartTable.GlowTexts = {glowName = glowName, glowSpeed = glowSpeed, glowDistance = glowDistance}
+        SpeedText = SpeedText or "N/A"
 
         PartTable.Connections.ESP = RunService.RenderStepped:Connect(function()
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local Vector, OnScreen = WorldToViewportPoint(Object.Position)
-                if OnScreen then
-                    PartTable.ESP.Visible = true
-                    for _, glow in pairs(glowName) do glow.Text.Visible = true end
-                    for _, glow in pairs(glowSpeed) do glow.Text.Visible = true end
-                    for _, glow in pairs(glowDistance) do glow.Text.Visible = true end
+            if PartTable.RainbowHue >= 1 then
+                PartTable.RainbowHue = 0
+            else
+                PartTable.RainbowHue = PartTable.RainbowHue + 0.005
+            end
 
-                    local basePos = Vector2new(Vector.X, Vector.Y - 40)
+            local rainbowColor = Color3.fromHSV(PartTable.RainbowHue, 1, 1)
+
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local Vector, OnScreen = Camera:WorldToViewportPoint(Object.Position)
+                if OnScreen then
+                    for _, glow in pairs(PartTable.GlowName) do glow.Text.Visible = true end
+                    for _, glow in pairs(PartTable.GlowSpeed) do glow.Text.Visible = true end
+                    for _, glow in pairs(PartTable.GlowDistance) do glow.Text.Visible = true end
+
+                    local basePos = Vector2.new(Vector.X, Vector.Y - 40)
 
                     PartTable.ESP.Visible = false
 
                     local NameText = ObjectName
-                    local SpeedText = "425k/s"
-                    local DistanceText = "["..tostring(mathfloor((Object.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude)).."]"
+                    local DistanceText = "["..tostring(math.floor((Object.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude)).."]"
 
-                    for _, glow in pairs(glowName) do
+                    -- Rainbow name glow
+                    for _, glow in pairs(PartTable.GlowName) do
                         glow.Text.Position = basePos + glow.Offset
                         glow.Text.Text = NameText
                         glow.Text.Size = TextSize or 24
-                        glow.Text.Color = Color3.fromRGB(255, 0, 0)
+                        glow.Text.Color = rainbowColor
                         glow.Text.Transparency = 0.7
                         glow.Text.Outline = false
                         glow.Text.Font = Drawing.Fonts.UI
                         glow.Text.Center = true
                     end
 
-                    local speedPos = basePos + Vector2new(0, TextSize or 24)
-                    for _, glow in pairs(glowSpeed) do
+                    -- Speed glow (green)
+                    local speedPos = basePos + Vector2.new(0, TextSize or 24)
+                    for _, glow in pairs(PartTable.GlowSpeed) do
                         glow.Text.Position = speedPos + glow.Offset
                         glow.Text.Text = SpeedText
                         glow.Text.Size = TextSize or 24
@@ -174,8 +181,9 @@ if game.PlaceId == 109983668079237 then
                         glow.Text.Center = true
                     end
 
-                    local distPos = speedPos + Vector2new(0, TextSize or 24)
-                    for _, glow in pairs(glowDistance) do
+                    -- Distance glow (red)
+                    local distPos = speedPos + Vector2.new(0, TextSize or 24)
+                    for _, glow in pairs(PartTable.GlowDistance) do
                         glow.Text.Position = distPos + glow.Offset
                         glow.Text.Text = DistanceText
                         glow.Text.Size = TextSize or 24
@@ -185,36 +193,32 @@ if game.PlaceId == 109983668079237 then
                         glow.Text.Font = Drawing.Fonts.UI
                         glow.Text.Center = true
                     end
-
                 else
-                    for _, glow in pairs(glowName) do glow.Text.Visible = false end
-                    for _, glow in pairs(glowSpeed) do glow.Text.Visible = false end
-                    for _, glow in pairs(glowDistance) do glow.Text.Visible = false end
+                    for _, glow in pairs(PartTable.GlowName) do glow.Text.Visible = false end
+                    for _, glow in pairs(PartTable.GlowSpeed) do glow.Text.Visible = false end
+                    for _, glow in pairs(PartTable.GlowDistance) do glow.Text.Visible = false end
                     PartTable.ESP.Visible = false
                 end
             else
-                for _, glow in pairs(glowName) do glow.Text.Visible = false end
-                for _, glow in pairs(glowSpeed) do glow.Text.Visible = false end
-                for _, glow in pairs(glowDistance) do glow.Text.Visible = false end
+                for _, glow in pairs(PartTable.GlowName) do glow.Text.Visible = false end
+                for _, glow in pairs(PartTable.GlowSpeed) do glow.Text.Visible = false end
+                for _, glow in pairs(PartTable.GlowDistance) do glow.Text.Visible = false end
                 PartTable.ESP.Visible = false
             end
 
-            if Object:GetFullName() ~= PartTable.OldPath or not Object then
+            if not Object or Object:GetFullName() ~= PartTable.OldPath then
                 PartTable.Connections.ESP:Disconnect()
                 PartTable.ESP:Remove()
-                for _, glow in pairs(glowName) do glow.Text:Remove() end
-                for _, glow in pairs(glowSpeed) do glow.Text:Remove() end
-                for _, glow in pairs(glowDistance) do glow.Text:Remove() end
+                for _, glow in pairs(PartTable.GlowName) do glow.Text:Remove() end
+                for _, glow in pairs(PartTable.GlowSpeed) do glow.Text:Remove() end
+                for _, glow in pairs(PartTable.GlowDistance) do glow.Text:Remove() end
             end
         end)
 
         return PartTable
     end
 
-    -- Track current ESP instance for cleanup
-    local currentBrainrotESP = nil
-
-    -- Add button on MainTab to show best brainrot info
+    -- MainTab Button to Show Best Brainrot notification
     MainTab:AddButton({
         Name = "Show Best Brainrot",
         Callback = function()
@@ -228,7 +232,20 @@ if game.PlaceId == 109983668079237 then
         end
     })
 
-    -- Add toggle on ESP tab for Brainrot Decorations ESP with proper add/remove
+    -- ESP Tab Toggles
+
+    -- Player ESP toggle (your existing)
+    EspTab:AddToggle({
+        Name = "Player ESP",
+        Default = false,
+        Callback = function(v)
+            if v then
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/Bant3r241/chams/refs/heads/main/ESP.lua"))()
+            end
+        end
+    })
+
+    -- Brainrot ESP toggle
     EspTab:AddToggle({
         Name = "Brainrot ESP",
         Default = false,
@@ -236,40 +253,24 @@ if game.PlaceId == 109983668079237 then
             if enabled then
                 local bestBrainrot = findBestBrainrot()
                 if bestBrainrot.decorationPart then
-                    -- Remove old ESP if any
+                    -- Clear previous ESP if any
                     if currentBrainrotESP then
-                        if currentBrainrotESP.Connections and currentBrainrotESP.Connections.ESP then
-                            currentBrainrotESP.Connections.ESP:Disconnect()
-                        end
-                        if currentBrainrotESP.ESP then currentBrainrotESP.ESP:Remove() end
-                        for _, glowSet in pairs(currentBrainrotESP.GlowTexts or {}) do
-                            for _, glow in pairs(glowSet) do
-                                if glow.Text then glow.Text:Remove() end
-                            end
-                        end
+                        currentBrainrotESP.Connections.ESP:Disconnect()
+                        currentBrainrotESP.ESP:Remove()
                         currentBrainrotESP = nil
                     end
-                    -- Add new ESP and save reference
-                    currentBrainrotESP = PartESP.AddESP(bestBrainrot.name .. " Decorations", bestBrainrot.decorationPart, 24)
+                    currentBrainrotESP = PartESP.AddESP(bestBrainrot.name, bestBrainrot.decorationPart, 24, bestBrainrot.generationText or "N/A")
                     print("Brainrot ESP enabled for", bestBrainrot.name)
                 else
                     print("No decoration part found for best brainrot")
                 end
             else
-                -- Remove ESP on toggle off
                 if currentBrainrotESP then
-                    if currentBrainrotESP.Connections and currentBrainrotESP.Connections.ESP then
-                        currentBrainrotESP.Connections.ESP:Disconnect()
-                    end
-                    if currentBrainrotESP.ESP then currentBrainrotESP.ESP:Remove() end
-                    for _, glowSet in pairs(currentBrainrotESP.GlowTexts or {}) do
-                        for _, glow in pairs(glowSet) do
-                            if glow.Text then glow.Text:Remove() end
-                        end
-                    end
+                    currentBrainrotESP.Connections.ESP:Disconnect()
+                    currentBrainrotESP.ESP:Remove()
                     currentBrainrotESP = nil
+                    print("Brainrot ESP disabled")
                 end
-                print("Brainrot ESP disabled")
             end
         end
     })
