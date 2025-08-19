@@ -14,30 +14,73 @@ if game.PlaceId == 109983668079237 then
         end
     end})
 
-    -- Money per second parsing
+    -- Parse "$3.5M/s" to number
     local function parseMoneyPerSec(text)
-        local num, suffix = text:match("%$([%d%.]+)([KMBT]?)/s")
-        return num and tonumber(num) * ({K = 1e3, M = 1e6, B = 1e9, T = 1e12})[suffix] or nil
+        local num, suffix = text:match("%$([%d%.]+)([KMBT]?)")
+        if not num then return nil end
+        num = tonumber(num)
+        if not num then return nil end
+        local multipliers = {
+            K = 1e3,
+            M = 1e6,
+            B = 1e9,
+            T = 1e12
+        }
+        return num * (multipliers[suffix] or 1)
     end
 
-    -- Find the best brainrot
+    -- Get Best Brainrot from workspace.Plots only
     local function findBestBrainrot()
-        local best = {value = 0, raw = "", name = "", part = nil}
-        local plotsFolder = workspace:FindFirstChild("Plots")
-        if not plotsFolder then return best end
+        local best = {
+            name = "Unknown", -- Default name
+            raw = "N/A",  -- Default money per second
+            value = 0     -- Default value (money per second)
+        }
 
-        for _, plot in pairs(plotsFolder:GetChildren()) do
-            for _, podium in pairs((plot:FindFirstChild("AnimalPodiums") or {}):GetChildren()) do
-                local part = podium:FindFirstChild("Base") and podium.Base:FindFirstChild("Decorations") and podium.Base.Decorations:FindFirstChild("Part")
-                local gen = podium.Base and podium.Base:FindFirstChild("Spawn"):FindFirstChild("Attachment"):FindFirstChild("AnimalOverhead"):FindFirstChild("Generation")
-                if gen and gen:IsA("TextLabel") then
-                    local value = parseMoneyPerSec(gen.Text)
-                    if value and value > best.value then
-                        best = {value = value, raw = gen.Text, name = (podium.Base and podium.Base:FindFirstChild("Spawn"):FindFirstChild("Attachment"):FindFirstChild("AnimalOverhead"):FindFirstChild("DisplayName") and podium.Base.Spawn.Attachment.AnimalOverhead.DisplayName.Text) or "Unknown", part = part}
+        -- Iterate through all plots in the workspace
+        local plotsFolder = workspace:FindFirstChild("Plots")
+        if plotsFolder then
+            for _, plot in pairs(plotsFolder:GetChildren()) do
+                local podiums = plot:FindFirstChild("AnimalPodiums")
+                if podiums then
+                    for _, podium in pairs(podiums:GetChildren()) do
+                        local base = podium:FindFirstChild("Base")
+                        if base and base:FindFirstChild("Spawn") then
+                            local attach = base.Spawn:FindFirstChild("Attachment")
+                            if attach and attach:FindFirstChild("AnimalOverhead") then
+                                local animalOverhead = attach.AnimalOverhead
+                                -- Search for the name TextLabel inside AnimalOverhead
+                                local nameLabel
+                                for _, child in pairs(animalOverhead:GetChildren()) do
+                                    if child:IsA("TextLabel") and child.Name == "DisplayName" then
+                                        nameLabel = child
+                                    end
+                                end
+
+                                -- Check if money per second is available
+                                local gen = attach.AnimalOverhead:FindFirstChild("Generation")
+                                if gen and gen:IsA("TextLabel") then
+                                    local text = gen.Text
+                                    if text and text:find("/s") then
+                                        local value = parseMoneyPerSec(text)
+                                        if value and value > best.value then
+                                            -- Update the best brainrot if we find a higher earning one
+                                            best.value = value
+                                            best.raw = text
+                                            -- Set the name dynamically based on the found name label
+                                            if nameLabel then
+                                                best.name = nameLabel.Text
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
                     end
                 end
             end
         end
+
         return best
     end
 
