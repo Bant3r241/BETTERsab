@@ -52,6 +52,7 @@ local function toggleBestBrainrotVisibility(state)
         print("[Debug] No valid brainrot found.")
     end
 end
+  })
 
         OrionLib:Init()
 end
