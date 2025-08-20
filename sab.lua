@@ -209,4 +209,94 @@ if game.PlaceId == 109983668079237 then
             if not Object or Object:GetFullName() ~= PartTable.OldPath then
                 PartTable.Connections.ESP:Disconnect()
                 PartTable.ESP:Remove()
-                for _, glow in pairs
+                for _, glow in pairs(PartTable.GlowName) do glow.Text:Remove() end
+                for _, glow in pairs(PartTable.GlowSpeed) do glow.Text:Remove() end
+                for _, glow in pairs(PartTable.GlowDistance) do glow.Text:Remove() end
+            end
+        end)
+
+        return PartTable
+    end
+
+    -- MainTab Button to Show Best Brainrot notification
+    MainTab:AddButton({
+        Name = "Show Best Brainrot",
+        Callback = function()
+            local bestBrainrot = findBestBrainrot()
+            print("Best Brainrot:", bestBrainrot.name, bestBrainrot.raw)
+            OrionLib:MakeNotification({
+                Name = "Best Brainrot",
+                Content = bestBrainrot.name .. " is earning " .. bestBrainrot.raw,
+                Time = 5
+            })
+        end
+    })
+
+    -- ESP Tab Toggles
+
+    -- Player ESP toggle (your existing)
+    EspTab:AddToggle({
+        Name = "Player ESP",
+        Default = false,
+        Callback = function(v)
+            if v then
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/Bant3r241/chams/refs/heads/main/ESP.lua"))()
+            end
+        end
+    })
+
+    -- Brainrot ESP toggle
+    EspTab:AddToggle({
+        Name = "Brainrot ESP",
+        Default = false,
+        Callback = function(enabled)
+            if enabled then
+                local bestBrainrot = findBestBrainrot()
+                if bestBrainrot.decorationPart then
+                    -- Clear previous ESP if any
+                    if currentBrainrotESP then
+                        currentBrainrotESP.Connections.ESP:Disconnect()
+                        currentBrainrotESP.ESP:Remove()
+                        -- Remove glow elements
+                        for _, glow in pairs(currentBrainrotESP.GlowName) do
+                            glow.Text:Remove()
+                        end
+                        for _, glow in pairs(currentBrainrotESP.GlowSpeed) do
+                            glow.Text:Remove()
+                        end
+                        for _, glow in pairs(currentBrainrotESP.GlowDistance) do
+                            glow.Text:Remove()
+                        end
+                        currentBrainrotESP = nil
+                    end
+                    currentBrainrotESP = PartESP.AddESP(bestBrainrot.name, bestBrainrot.decorationPart, 24, bestBrainrot.generationText or "N/A")
+                    print("Brainrot ESP enabled for", bestBrainrot.name)
+                else
+                    print("No decoration part found for best brainrot")
+                end
+            else
+                -- Disable the Brainrot ESP and clean up if already active
+                if currentBrainrotESP then
+                    -- Disconnect and remove ESP elements
+                    currentBrainrotESP.Connections.ESP:Disconnect()
+                    currentBrainrotESP.ESP:Remove()
+                    -- Remove glow elements
+                    for _, glow in pairs(currentBrainrotESP.GlowName) do
+                        glow.Text:Remove()
+                    end
+                    for _, glow in pairs(currentBrainrotESP.GlowSpeed) do
+                        glow.Text:Remove()
+                    end
+                    for _, glow in pairs(currentBrainrotESP.GlowDistance) do
+                        glow.Text:Remove()
+                    end
+                    currentBrainrotESP = nil
+                    print("Brainrot ESP disabled")
+                end
+            end
+        end
+    })
+
+    -- Initialize the OrionLib UI
+    OrionLib:Init()
+end
